@@ -1,24 +1,31 @@
 version: "3.9"
 
 services:
-  webserver:
+  web02:
     image: nginx:latest
-    container_name: webserver_docker
+    container_name: webserver_app_2
     restart: unless-stopped
     tty: true
     ports:
-      - "80:80"
+      - "1080:80"
+    labels:
+      - "traefik.enable=true" # enables the service
+      - "traefik.http.routers.web02.rule=Host(`web02.prosethsolutions.com`)" # domain to expose on
+      - "traefik.http.routers.web02.entrypoints=web" # if you named your 443 entrypoint differently than webscure, substitute it here!
+        #- "traefik.http.routers.webserver.tls=true" # if you named your cert resolver differently than letsencrypt, substitute it here!
+      - "traefik.http.services.web02.loadbalancer.server.port=80"
     volumes:
       - ./src:/var/www
       - ./nginx/conf.d:/etc/nginx/conf.d
     links:
       - php
     networks:
-      - laravel_docker-networks
+      - traefik-global-proxy
+      - laravel_app_networks_2
 
   php:
-    image: php:8.2-fpm
-    container_name: php_docker
+    image: chanmesa/php-laravel:latest
+    container_name: php_app_2
     restart: unless-stopped
     tty: true
     environment:
@@ -29,15 +36,15 @@ services:
       - ./src:/var/www
       - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
-      - laravel_docker-networks
+      - laravel_app_networks_2
 
   db:
     image: mysql:latest
-    container_name: db_docker
+    container_name: db_app_2
     restart: unless-stopped
     tty: true
     ports:
-      - "3306:3306"
+      - "5306:3306"
     environment:
       MYSQL_DATABASE: db_docker
       MYSQL_USER: user
@@ -49,24 +56,34 @@ services:
       - db:/var/lib/mysql
       - ./mysql/my.conf:/etc/mysql/my.conf
     networks:
-      - laravel_docker-networks
+      - laravel_app_networks_2
 
-  phpmyadmin:
+  web02phpmyadmin:
     depends_on:
       - db
     image: phpmyadmin:latest
-    container_name: phpmyadmin_docker
+    container_name: phpmyadmin_app_2
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8090:80"
+    labels:
+      - "traefik.enable=true" # enables the service
+      - "traefik.http.routers.web02phpmyadmin.rule=Host(`web02phpmyadmin.prosethsolutions.com`)" # domain to expose on
+      - "traefik.http.routers.web02phpmyadmin.entrypoints=web" # if you named your 443 entrypoint differently than webscure, substitute it here!
+        #- "traefik.http.routers.webserver.tls=true" # if you named your cert resolver differently than letsencrypt, substitute it here!
+      - "traefik.http.services.web02phpmyadmin.loadbalancer.server.port=80"
+     
     environment:
       PMA_HOST: db
     networks:
-      - laravel_docker-networks
+      - traefik-global-proxy      
+      - laravel_app_networks_2
 
 networks:
-  laravel_docker-networks:
+  laravel_app_networks_2:
     driver: bridge
+  traefik-global-proxy:
+    external: true
 
 volumes:
   db:
